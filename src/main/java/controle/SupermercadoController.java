@@ -1,6 +1,6 @@
 package controle;
 
-import dados.EstoqueRepository; // Importando o nosso novo back-end
+import dados.EstoqueRepository;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.*;
@@ -12,6 +12,7 @@ import modelo.ProdutoAlimenticio;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.List;
 
 public class SupermercadoController {
     private ArrayList<Produto> estoqueOriginal = new ArrayList<>();
@@ -19,6 +20,9 @@ public class SupermercadoController {
     
     // Instanciando o gerenciador de dados (back-end)
     private EstoqueRepository estoqueRepo = new EstoqueRepository();
+    
+    // NOVA LISTA: Guarda os carrinhos (objetos) reais vendidos para fins de exportação detalhada
+    private List<List<Produto>> historicoCarrinhosObjetos = new ArrayList<>();
     
     private ObservableList<String> itensVitrine = FXCollections.observableArrayList();
     private ObservableList<String> itensCarrinho = FXCollections.observableArrayList();
@@ -35,7 +39,6 @@ public class SupermercadoController {
     }
 
     public void carregarEstoqueAutomatico() {
-        // O repositório faz o trabalho pesado de ler o arquivo e nos entrega a lista pronta
         this.estoqueOriginal = estoqueRepo.carregarEstoque();
         atualizarTela();
     }
@@ -59,13 +62,10 @@ public class SupermercadoController {
             return;
         }
 
-        // 1. Abate a quantidade na memória (Atenção: sua lógica original já reduzia 1 
-        // no adicionarSelecionado(), repita o abate aqui apenas se for necessário)
+        // 1. Abate a quantidade na memória
         for (Produto itemCarrinho : carrinho.getItens()) {
             for (Produto itemEstoque : estoqueOriginal) {
                 if (itemEstoque.getNome().equals(itemCarrinho.getNome())) {
-                    // Como você já abateu no adicionarSelecionado(), o código abaixo pode ser redundante, 
-                    // mas mantive conforme você enviou para preservar sua regra de negócio:
                     int novaQuantidade = itemEstoque.getQuantidadeEstoque() - 1; 
                     itemEstoque.setQuantidadeEstoque(Math.max(0, novaQuantidade)); 
                 }
@@ -75,17 +75,20 @@ public class SupermercadoController {
         // 2. Chama o back-end para gravar as alterações no arquivo físico
         estoqueRepo.salvarEstoque(estoqueOriginal);
 
-        // 3. Atualiza o histórico visual
+        // 3. SALVA A "FOTO" DO CARRINHO ATUAL NO HISTÓRICO DE BASTIDORES
+        List<Produto> copiaItensDoPedido = new ArrayList<>(carrinho.getItens());
+        historicoCarrinhosObjetos.add(copiaItensDoPedido);
+
+        // 4. Atualiza o histórico visual da tela
         double total = carrinho.calcularTotal();
-        lvHistorico.getItems().add("Pedido: R$ " + String.format("%.2f", total));
+        lvHistorico.getItems().add("Pedido #" + historicoCarrinhosObjetos.size() + " - Total: R$ " + String.format("%.2f", total));
         
+        // 5. Limpa e atualiza
         carrinho.limpar();
         atualizarTela();
         mostrarAlerta("Sucesso", "Compra finalizada e estoque atualizado!");
     }
 
-    // O método importarCSV usa FileChooser (elemento visual do front), então ele fica aqui,
-    // mas note que após processar o arquivo selecionado, poderíamos usar o estoqueRepo para salvar se quiséssemos.
     public void importarCSV(Stage stage) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Arquivos CSV", "*.csv"));
@@ -108,7 +111,6 @@ public class SupermercadoController {
                     }
                 }
                 carrinho.limpar();
-                // Opcional: estoqueRepo.salvarEstoque(estoqueOriginal); // Para fixar esse novo estoque como o padrão
                 atualizarTela();
                 mostrarAlerta("Sucesso", "Estoque importado via CSV!");
             } catch (Exception e) {
@@ -117,25 +119,71 @@ public class SupermercadoController {
         }
     }
 
-    public void exportarPedidos(Stage stage) {
-        if (historicoPedidos.isEmpty()) {
-            mostrarAlerta("Aviso", "Nenhum pedido para exportar.");
-            return;
-        }
-
+    public void exportarPedidos(Stage stagePrincipal) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setInitialFileName("relatorio_pedidos.csv");
-        File file = fileChooser.showSaveDialog(stage);
-
-        if (file != null) {
-            try (PrintWriter pw = new PrintWriter(new FileWriter(file))) {
-                pw.println("Relatorio de Pedidos");
-                for (String ped : historicoPedidos) {
-                    pw.println(ped);
+        fileChooser.setTitle("Salvar Relatório de Pedidos Detalhado");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Arquivos CSV (*.csv)", "*.csv"));
+        fileChooser.setInitialFileName("relatorio_pedidos_detalhado.csv");
+        
+        File arquivo = fileChooser.showSaveDialog(stagePrincipal);
+        
+        if (arquivo != null) {
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(arquivo))) {
+                
+                // 1. Escreve o cabeçalho
+                bw.write("ID_Pedido,Item_Nome,Preco_Unitario,Quantidade,Subtotal_Item,Total_Pedido");
+                bw.newLine();
+                
+                int idPedido = 1;
+                
+                // 2. Itera sobre a lista de listas de produtos salvos nos bastidores
+                for (List<Produto> produtosDoPedido : historicoCarrinhosObjetos) {
+                    
+                    // Calcula o total somando os preços dos produtos contidos nesta venda
+                    double totalDoPedido = 0;
+                    for (Produto p : produtosDoPedido) {
+                        totalDoPedido += p.getPreco();
+                    }
+                    
+                    boolean primeiraLinhaDoPedido = true;
+                    
+                    // 3. Detalha item por item no arquivo
+                    for (Produto prod : produtosDoPedido) {
+                        String nome = prod.getNome();
+                        double preco = prod.getPreco();
+                        int qtd = 1; 
+                        double subtotal = preco * qtd;
+                        
+                        // O total geral do pedido só aparece fixado ao lado da primeira linha dele
+                        String totalString = primeiraLinhaDoPedido ? String.format("%.2f", totalDoPedido) : "";
+                        
+                        String linha = String.format("%d,%s,%.2f,%d,%.2f,%s", 
+                                idPedido, 
+                                nome, 
+                                preco, 
+                                qtd, 
+                                subtotal, 
+                                totalString
+                        );
+                        
+                        bw.write(linha);
+                        bw.newLine();
+                        
+                        primeiraLinhaDoPedido = false;
+                    }
+                    
+                    // Linha divisória estética entre as notas fiscais
+                    bw.write("---,---,---,---,---,---");
+                    bw.newLine();
+                    
+                    idPedido++;
                 }
-                mostrarAlerta("Sucesso", "Pedidos exportados para CSV!");
-            } catch (Exception e) {
-                mostrarAlerta("Erro", "Falha ao salvar o arquivo.");
+                
+                mostrarAlerta("Sucesso", "Relatório de pedidos exportado com detalhes com sucesso!");
+                
+            } catch (IOException ex) {
+                System.out.println("Erro ao exportar pedidos: " + ex.getMessage());
+                mostrarAlerta("Erro", "Não foi possível exportar os pedidos.");
             }
         }
     }

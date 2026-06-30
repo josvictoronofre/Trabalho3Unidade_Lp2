@@ -1,0 +1,5 @@
+ID_Pedido,Item_Nome,Preco_Unitario,Quantidade,Subtotal_Item,Total_Pedido
+1,Feijao Preto 1kg,8.50,1,8.50,18.48
+1,Leite Desnatado 1L,4.99,1,4.99,
+1,Leite Desnatado 1L,4.99,1,4.99,
+---,---,---,---,---,---
