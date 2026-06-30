@@ -1,4 +1,4 @@
-package aplicacao;
+package modelo;
 
 public class ProdutoAlimenticio extends Produto {
     // Atributo específico da classe filha

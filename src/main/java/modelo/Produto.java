@@ -1,4 +1,4 @@
-package aplicacao;
+package modelo;
 
 public abstract class Produto {
     private int id;

@@ -1,4 +1,4 @@
-package aplicacao;
+package controle;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -6,6 +6,10 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import modelo.CarrinhoDeCompras;
+import modelo.Produto;
+import modelo.ProdutoAlimenticio;
+
 import java.io.*;
 import java.util.ArrayList;
 

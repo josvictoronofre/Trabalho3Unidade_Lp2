@@ -1,5 +1,6 @@
 package aplicacao;
 
+import controle.SupermercadoController;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
