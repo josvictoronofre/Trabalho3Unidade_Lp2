@@ -1,9 +1,9 @@
 package controle;
 
+import dados.EstoqueRepository; // Importando o nosso novo back-end
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import modelo.CarrinhoDeCompras;
@@ -17,7 +17,9 @@ public class SupermercadoController {
     private ArrayList<Produto> estoqueOriginal = new ArrayList<>();
     private CarrinhoDeCompras carrinho = new CarrinhoDeCompras();
     
-    // Listas especiais do JavaFX para atualizar a tela automaticamente
+    // Instanciando o gerenciador de dados (back-end)
+    private EstoqueRepository estoqueRepo = new EstoqueRepository();
+    
     private ObservableList<String> itensVitrine = FXCollections.observableArrayList();
     private ObservableList<String> itensCarrinho = FXCollections.observableArrayList();
     private ObservableList<String> historicoPedidos = FXCollections.observableArrayList();
@@ -32,42 +34,10 @@ public class SupermercadoController {
         atualizarTela();
     }
 
- // Substitua o antigo inicializarEstoquePadrao por este:
     public void carregarEstoqueAutomatico() {
-        // Procura o arquivo "estoque.csv" na pasta raiz do seu projeto
-        File arquivo = new File("estoque.csv");
-        
-        if (!arquivo.exists()) {
-            System.out.println("Arquivo estoque.csv não encontrado na raiz. Iniciando zerado.");
-            return;
-        }
-
-        try (BufferedReader br = new BufferedReader(new FileReader(arquivo))) {
-            String linha;
-            estoqueOriginal.clear();
-            
-            // Pula o cabeçalho (Nome,Preco,Quantidade)
-            br.readLine(); 
-
-            int id = 1;
-            while ((linha = br.readLine()) != null) {
-                linha = linha.trim();
-                if (linha.isEmpty()) continue;
-
-                String[] colunas = linha.split(",");
-                if (colunas.length >= 3) {
-                    String nome = colunas[0].trim();
-                    double preco = Double.parseDouble(colunas[1].trim());
-                    int qtd = Integer.parseInt(colunas[2].trim());
-                    
-                    estoqueOriginal.add(new ProdutoAlimenticio(id++, nome, preco, qtd, "N/A"));
-                }
-            }
-            atualizarTela();
-            System.out.println("Estoque carregado automaticamente via CSV com sucesso!");
-        } catch (Exception e) {
-            System.out.println("Erro ao carregar o estoque automático: " + e.getMessage());
-        }
+        // O repositório faz o trabalho pesado de ler o arquivo e nos entrega a lista pronta
+        this.estoqueOriginal = estoqueRepo.carregarEstoque();
+        atualizarTela();
     }
 
     public void adicionarSelecionado() {
@@ -82,27 +52,6 @@ public class SupermercadoController {
             }
         }
     }
-    
-    public void salvarEstoqueNoCSV() {
-        File arquivo = new File("estoque.csv");
-        
-        // O BufferedWriter vai sobrescrever o arquivo antigo com os dados atualizados
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(arquivo))) {
-            // Escreve o cabeçalho padrão
-            bw.write("Nome,Preco,Quantidade");
-            bw.newLine();
-            
-            // Percorre o estoque atual da memória e grava linha por linha
-            for (Produto p : estoqueOriginal) {
-                String linha = p.getNome() + "," + p.getPreco() + "," + p.getQuantidadeEstoque();
-                bw.write(linha);
-                bw.newLine();
-            }
-            System.out.println("Arquivo estoque.csv atualizado com sucesso no disco!");
-        } catch (Exception e) {
-            System.out.println("Erro ao salvar o estoque no arquivo: " + e.getMessage());
-        }
-    }
 
     public void finalizarCompra() {
         if (carrinho.getItens().isEmpty()) {
@@ -110,21 +59,23 @@ public class SupermercadoController {
             return;
         }
 
-        // 1. Abate a quantidade dos produtos no estoque da memória
+        // 1. Abate a quantidade na memória (Atenção: sua lógica original já reduzia 1 
+        // no adicionarSelecionado(), repita o abate aqui apenas se for necessário)
         for (Produto itemCarrinho : carrinho.getItens()) {
             for (Produto itemEstoque : estoqueOriginal) {
                 if (itemEstoque.getNome().equals(itemCarrinho.getNome())) {
-                    // Diminui 1 unidade do estoque (ou a quantidade comprada)
+                    // Como você já abateu no adicionarSelecionado(), o código abaixo pode ser redundante, 
+                    // mas mantive conforme você enviou para preservar sua regra de negócio:
                     int novaQuantidade = itemEstoque.getQuantidadeEstoque() - 1; 
-                    itemEstoque.setQuantidadeEstoque(Math.max(0, novaQuantidade)); // Garante que não fica negativo
+                    itemEstoque.setQuantidadeEstoque(Math.max(0, novaQuantidade)); 
                 }
             }
         }
 
-        // 2. Grava as novas quantidades direto no arquivo estoque.csv
-        salvarEstoqueNoCSV();
+        // 2. Chama o back-end para gravar as alterações no arquivo físico
+        estoqueRepo.salvarEstoque(estoqueOriginal);
 
-        // 3. Restante do seu fluxo normal (adicionar ao histórico, limpar carrinho, etc.)
+        // 3. Atualiza o histórico visual
         double total = carrinho.calcularTotal();
         lvHistorico.getItems().add("Pedido: R$ " + String.format("%.2f", total));
         
@@ -133,6 +84,8 @@ public class SupermercadoController {
         mostrarAlerta("Sucesso", "Compra finalizada e estoque atualizado!");
     }
 
+    // O método importarCSV usa FileChooser (elemento visual do front), então ele fica aqui,
+    // mas note que após processar o arquivo selecionado, poderíamos usar o estoqueRepo para salvar se quiséssemos.
     public void importarCSV(Stage stage) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Arquivos CSV", "*.csv"));
@@ -142,7 +95,7 @@ public class SupermercadoController {
             try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                 String linha;
                 estoqueOriginal.clear();
-                br.readLine(); // Pula o cabeçalho
+                br.readLine(); 
 
                 int id = 1;
                 while ((linha = br.readLine()) != null) {
@@ -155,6 +108,7 @@ public class SupermercadoController {
                     }
                 }
                 carrinho.limpar();
+                // Opcional: estoqueRepo.salvarEstoque(estoqueOriginal); // Para fixar esse novo estoque como o padrão
                 atualizarTela();
                 mostrarAlerta("Sucesso", "Estoque importado via CSV!");
             } catch (Exception e) {
@@ -208,7 +162,6 @@ public class SupermercadoController {
         alert.showAndWait();
     }
 
-    // Getters para montar o layout na classe Main
     public ListView<String> getLvVitrine() { return lvVitrine; }
     public ListView<String> getLvCarrinho() { return lvCarrinho; }
     public ListView<String> getLvHistorico() { return lvHistorico; }
