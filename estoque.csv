@@ -1,5 +1,16 @@
-Nome,Preco,Quantidade
-Arroz Integral 5kg,29.9,10
-Feijao Preto 1kg,8.5,14
-Leite Desnatado 1L,4.99,18
-Cafe Torrado 500g,18.5,8
+Nome,Preco,Quantidade,DataValidade
+Arroz Integral Camil 1kg,6.49,120,15/05/2027
+Feijao Carioca Kicaldo 1kg,8.19,95,28/02/2027
+Leite Integral Italac 1L,5.29,240,10/10/2026
+Cafe Torrado Melitta 500g,18.90,80,01/04/2027
+Macarrao Espaguete Adria 500g,3.79,150,31/12/2027
+Iogurte Natural Nestle 170g,2.89,60,25/07/2026
+Manteiga com Sal Elege 200g,9.98,55,01/09/2026
+Queijo Mucarela Fatiado Sadia 150g,11.49,40,18/07/2026
+Pao de Forma Bauducco 390g,7.49,50,12/07/2026
+Creme Dental Colgate Total 90g,6.89,140,N/A
+Shampoo Pantene Restauracao 400ml,19.90,75,N/A
+Sabonete em Barra Dove Original 90g,4.25,220,N/A
+Detergente Liquido Ype Coco 500ml,2.45,250,N/A
+Sabao em Po Omo Perfeito 1.6kg,22.80,85,N/A
+Banana Prata Climatizada kg,5.99,45,05/07/2026
