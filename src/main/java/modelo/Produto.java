@@ -1,6 +1,6 @@
 package modelo;
 
-public abstract class Produto {
+public class Produto {
     private int id;
     private String nome;
     private double preco;
